@@ -1,0 +1,222 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pac-Man Mobile</title>
+  <style>
+    canvas {
+      background-color: black;
+      display: block;
+      margin: 0 auto;
+      width: 100%;
+      max-width: 500px;
+    }
+
+    /* Estilo para os botões de controle */
+    .controls {
+      display: flex;
+      justify-content: center;
+      margin-top: 10px;
+    }
+
+    .button {
+      width: 50px;
+      height: 50px;
+      background-color: #ddd;
+      border: 1px solid #aaa;
+      margin: 5px;
+      text-align: center;
+      line-height: 50px;
+      font-size: 18px;
+      user-select: none;
+      border-radius: 5px;
+    }
+
+    .arrow-keys {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .horizontal {
+      display: flex;
+    }
+
+    .button:active {
+      background-color: #ccc;
+    }
+  </style>
+</head>
+<body>
+
+  <canvas id="pacmanCanvas" width="500" height="500"></canvas>
+
+  <!-- Controles de toque -->
+  <div class="controls">
+    <div class="arrow-keys">
+      <div class="button" id="up">▲</div>
+      <div class="horizontal">
+        <div class="button" id="left">◀</div>
+        <div class="button" id="right">▶</div>
+      </div>
+      <div class="button" id="down">▼</div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('pacmanCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let pacMan = { x: 50, y: 50, radius: 20, direction: 'right', speed: 3, canEatGhosts: false, poweredUp: false };
+
+    const ghosts = [
+      { x: 150, y: 150, radius: 20, color: 'red', speedX: 2, speedY: 2, vulnerable: false },
+      { x: 300, y: 200, radius: 20, color: 'blue', speedX: 2, speedY: -2, vulnerable: false }
+    ];
+
+    let fruit = { x: 100, y: 100, radius: 10, color: 'orange', collected: false };
+
+    const walls = [
+      { x: 50, y: 100, width: 300, height: 10 },
+      { x: 150, y: 200, width: 10, height: 200 },
+      { x: 250, y: 150, width: 200, height: 10 }
+    ];
+
+    let score = 0;
+
+    function drawPacMan() {
+      ctx.beginPath();
+      ctx.arc(pacMan.x, pacMan.y, pacMan.radius, 0.2 * Math.PI, 1.8 * Math.PI);
+      ctx.lineTo(pacMan.x, pacMan.y);
+      ctx.fillStyle = pacMan.canEatGhosts ? 'lightblue' : 'yellow';
+      ctx.fill();
+    }
+
+    function drawGhosts() {
+      ghosts.forEach(ghost => {
+        ctx.beginPath();
+        ctx.arc(ghost.x, ghost.y, ghost.radius, 0, 2 * Math.PI);
+        ctx.fillStyle = ghost.vulnerable ? 'lightblue' : ghost.color;
+        ctx.fill();
+      });
+    }
+
+    function drawFruit() {
+      if (!fruit.collected) {
+        ctx.beginPath();
+        ctx.arc(fruit.x, fruit.y, fruit.radius, 0, 2 * Math.PI);
+        ctx.fillStyle = fruit.color;
+        ctx.fill();
+      }
+    }
+
+    function drawWalls() {
+      ctx.fillStyle = 'blue';
+      walls.forEach(wall => {
+        ctx.fillRect(wall.x, wall.y, wall.width, wall.height);
+      });
+    }
+
+    function movePacMan() {
+      let newX = pacMan.x, newY = pacMan.y;
+
+      if (pacMan.direction === 'right') newX += pacMan.speed;
+      if (pacMan.direction === 'left') newX -= pacMan.speed;
+      if (pacMan.direction === 'up') newY -= pacMan.speed;
+      if (pacMan.direction === 'down') newY += pacMan.speed;
+
+      if (newX + pacMan.radius > canvas.width) newX = pacMan.radius;
+      if (newX - pacMan.radius < 0) newX = canvas.width - pacMan.radius;
+      if (newY + pacMan.radius > canvas.height) newY = pacMan.radius;
+      if (newY - pacMan.radius < 0) newY = canvas.height - pacMan.radius;
+
+      if (!walls.some(wall => isCollidingWithWall(newX, newY, pacMan.radius, wall))) {
+        pacMan.x = newX;
+        pacMan.y = newY;
+      }
+    }
+
+    function moveGhosts() {
+      ghosts.forEach(ghost => {
+        ghost.x += ghost.speedX;
+        ghost.y += ghost.speedY;
+
+        if (ghost.x + ghost.radius > canvas.width || ghost.x - ghost.radius < 0) ghost.speedX *= -1;
+        if (ghost.y + ghost.radius > canvas.height || ghost.y - ghost.radius < 0) ghost.speedY *= -1;
+      });
+    }
+
+    function checkCollisions() {
+      ghosts.forEach(ghost => {
+        const distX = ghost.x - pacMan.x;
+        const distY = ghost.y - pacMan.y;
+        const distance = Math.sqrt(distX * distX + distY * distY);
+
+        if (distance < ghost.radius + pacMan.radius) {
+          if (pacMan.canEatGhosts && ghost.vulnerable) {
+            ghost.x = Math.random() * canvas.width;
+            ghost.y = Math.random() * canvas.height;
+            score += 50;
+            ghost.vulnerable = false;
+          } else {
+            alert('Game Over! Your score: ' + score);
+            document.location.reload();
+          }
+        }
+      });
+
+      const distX = fruit.x - pacMan.x;
+      const distY = fruit.y - pacMan.y;
+      const distance = Math.sqrt(distX * distX + distY * distY);
+
+      if (distance < fruit.radius + pacMan.radius && !fruit.collected) {
+        fruit.collected = true;
+        score += 10;
+        pacMan.canEatGhosts = true;
+        pacMan.poweredUp = true;
+        setTimeout(() => pacMan.canEatGhosts = false, 5000);
+
+        fruit.x = Math.random() * (canvas.width - 40) + 20;
+        fruit.y = Math.random() * (canvas.height - 40) + 20;
+
+        ghosts.forEach(ghost => ghost.vulnerable = true);
+      }
+    }
+
+    function drawScore() {
+      ctx.fillStyle = 'white';
+      ctx.font = '20px Arial';
+      ctx.fillText("Score: " + score, 10, 20);
+    }
+
+    function isCollidingWithWall(x, y, radius, wall) {
+      return x + radius > wall.x && x - radius < wall.x + wall.width &&
+             y + radius > wall.y && y - radius < wall.y + wall.height;
+    }
+
+    function gameLoop() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      movePacMan();
+      moveGhosts();
+      checkCollisions();
+
+      drawWalls();
+      drawPacMan();
+      drawGhosts();
+      drawFruit();
+      drawScore();
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    // Controles de toque
+    document.getElementById('up').addEventListener('click', () => pacMan.direction = 'up');
+    document.getElementById('down').addEventListener('click', () => pacMan.direction = 'down');
+    document.getElementById('left').addEventListener('click', () => pacMan.direction = 'left');
+    document.getElementById('right').addEventListener('click', () => pacMan.direction = 'right');
+
+    gameLoop();
+  </script>
+</body>
+</html>
